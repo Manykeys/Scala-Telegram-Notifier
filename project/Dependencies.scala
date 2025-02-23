@@ -4,6 +4,7 @@ object Dependencies {
   // cats
   val catsCore   = "org.typelevel" %% "cats-core"   % "2.13.0"
   val catsEffect = "org.typelevel" %% "cats-effect" % "3.5.7"
+  val catsTest = "org.typelevel" %% "munit-cats-effect-3" % "1.0.7" % Test
 
   // tapir
   val tapirVersion = "1.11.13"
@@ -44,6 +45,7 @@ object Dependencies {
   val allDeps: Seq[ModuleID] = Seq(
     catsCore,
     catsEffect,
+    catsTest,
     tapirHttp4s,
     tapirSwagger,
     tapirTethys,
