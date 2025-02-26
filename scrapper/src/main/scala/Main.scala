@@ -1,7 +1,7 @@
 package scrapper
 
 import cats.effect.{ExitCode, IO, IOApp}
-import com.comcast.ip4s.{Host, Port, port}
+import com.comcast.ip4s.{Host, Port}
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
 import sttp.tapir.server.http4s.Http4sServerInterpreter
@@ -11,11 +11,12 @@ object Main extends IOApp:
   override def run(args: List[String]): IO[ExitCode] =
     for {
       configLoader <- ConfigLoader.make[IO]
-      config <- configLoader.load
-      maybePort = config.httpPort.toOption
+      config       <- configLoader.load
+      maybePort        = config.httpPort.toOption
       maybeGithubToken = config.githubToken.toOption
-
-      routes = Http4sServerInterpreter[IO]().toRoutes(Endpoints.all)
+      
+      endpoints <- Endpoints.all
+      routes = Http4sServerInterpreter[IO]().toRoutes(endpoints)
 
       port <- maybePort match {
         case Some(p) => IO.pure(p)
@@ -35,7 +36,9 @@ object Main extends IOApp:
         .build
         .use: server =>
           for
-            _ <- IO.println(s"Go to http://localhost:${server.address.getPort}/docs to open SwaggerUI. Press ENTER key to exit.")
+            _ <- IO.println(
+              s"Go to http://localhost:${server.address.getPort}/docs to open SwaggerUI. Press ENTER key to exit."
+            )
             _ <- IO.readLine
           yield ()
     } yield ExitCode.Success
