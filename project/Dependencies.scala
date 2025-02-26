@@ -42,6 +42,12 @@ object Dependencies {
   val pureConfigCore    = "com.github.pureconfig" %% "pureconfig-core"           % pureConfigVersion
   val pureConfigGeneric = "com.github.pureconfig" %% "pureconfig-generic-scala3" % pureConfigVersion
 
+  // quartz4s
+  val quartz = "com.itv" %% "quartz4s-core" % "1.0.4"
+
+  val telegramiumCore = "io.github.apimorphism" %% "telegramium-core" % "9.803.0"
+  val telegramiumHigh = "io.github.apimorphism" %% "telegramium-high" % "9.803.0"
+
   val allDeps: Seq[ModuleID] = Seq(
     catsCore,
     catsEffect,
@@ -59,6 +65,9 @@ object Dependencies {
     tethysJackson,
     tethysDerivation,
     pureConfigCore,
-    pureConfigGeneric
+    pureConfigGeneric,
+    quartz,
+    telegramiumCore,
+    telegramiumHigh
   )
 }
