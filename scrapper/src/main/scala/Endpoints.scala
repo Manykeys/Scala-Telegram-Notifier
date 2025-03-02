@@ -24,22 +24,9 @@ object Endpoints:
   case class AddLinkRequest(link: String, tags: List[String], filters: List[String])
   case class RemoveLinkRequest(link: String)
   case class ListLinksResponse(links: List[LinkResponse], size: Int)
-  case class LinksDataResponse(data: Map[String, List[List[Long]]])
-
-  implicit val tupleWriter: JsonWriter[(Long, List[String], List[String])] =
-    new JsonWriter[(Long, List[String], List[String])] {
-      def write(value: (Long, List[String], List[String]), tokenWriter: TokenWriter): Unit = {
-        tokenWriter.writeArrayStart()
-        tokenWriter.writeNumber(value._1)
-        tokenWriter.writeArrayStart()
-        value._2.foreach(tokenWriter.writeString)
-        tokenWriter.writeArrayEnd()
-        tokenWriter.writeArrayStart()
-        value._3.foreach(tokenWriter.writeString)
-        tokenWriter.writeArrayEnd()
-        tokenWriter.writeArrayEnd()
-      }
-    }
+  case class LinksDataResponse(data: Map[String, List[Long]])
+  case class AddNumberRequest(key: String, value: Long)
+  case class NumberResponse(key: String, value: Long)
 
   implicit val apiErrorResponseReader: JsonReader[ApiErrorResponse]       = JsonReader.derived
   implicit val apiErrorResponseWriter: JsonObjectWriter[ApiErrorResponse] = JsonObjectWriter.derived
@@ -58,6 +45,12 @@ object Endpoints:
 
   implicit val linksDataResponseReader: JsonReader[LinksDataResponse]       = JsonReader.derived
   implicit val linksDataResponseWriter: JsonObjectWriter[LinksDataResponse] = JsonObjectWriter.derived
+
+  implicit val numberResponseReader: JsonReader[NumberResponse] = JsonReader.derived
+  implicit val numberResponseWriter: JsonObjectWriter[NumberResponse] = JsonObjectWriter.derived
+
+  implicit val addNumberResponseReader: JsonReader[AddNumberRequest] = JsonReader.derived
+  implicit val addNumberResponseWriter: JsonObjectWriter[AddNumberRequest] = JsonObjectWriter.derived
 
   def registerChatLogic(id: Long, repository: LinkRepository[IO]): IO[Either[ApiErrorResponse, Unit]] =
     repository.registerChat(id).map { _ =>
@@ -107,6 +100,27 @@ object Endpoints:
     repository.getAllUrlData.map {
       case data if data.nonEmpty => Right(LinksDataResponse(data))
       case _                     => Left(ApiErrorResponse("No data found", "404", None, None, None))
+    }
+
+  def addNumberLogic(
+                      request: AddNumberRequest,
+                      repository: LinkRepository[IO]
+                    ): IO[Either[ApiErrorResponse, NumberResponse]] =
+    repository.addNumber(request.key, request.value) *> IO {
+      println(s"Added number for key ${request.key}: ${request.value}")
+      Right(NumberResponse(request.key, request.value))
+    }
+
+  def getNumberLogic(
+                      key: String,
+                      repository: LinkRepository[IO]
+                    ): IO[Either[ApiErrorResponse, NumberResponse]] =
+    repository.getNumber(key).map {
+      case Some(value) =>
+        println(s"Fetched number for key $key: $value")
+        Right(NumberResponse(key, value))
+      case None =>
+        Left(ApiErrorResponse("Number not found", "404", None, None, None))
     }
 
   def createLinkRepository: IO[LinkRepository[IO]] = LinkRepository.create
@@ -160,7 +174,22 @@ object Endpoints:
       .serverLogic { _ =>
         getAllLinksLogic(repository)
       }
-  } yield List(registerChat, deleteChat, getLinks, addLink, removeLink, getAllLinks)
+    addNumber = endpoint.post
+      .in("number")
+      .in(jsonBody[AddNumberRequest])
+      .errorOut(jsonBody[ApiErrorResponse])
+      .out(jsonBody[NumberResponse])
+      .serverLogic { request =>
+        addNumberLogic(request, repository)
+      }
+    getNumber = endpoint.get
+      .in("number" / path[String]("key"))
+      .errorOut(jsonBody[ApiErrorResponse])
+      .out(jsonBody[NumberResponse])
+      .serverLogic { key =>
+        getNumberLogic(key, repository)
+      }
+  } yield List(registerChat, deleteChat, getLinks, addLink, removeLink, getAllLinks, addNumber, getNumber)
 
   val apiEndpoints: IO[List[ServerEndpoint[Any, IO]]] = allEndpoints
 
