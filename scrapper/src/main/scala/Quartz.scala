@@ -36,9 +36,9 @@ class GithubJob extends Job {
         .get(uri"http://localhost:8080/links/all")
         .response(asStringAlways)
       for {
-        live         <- backend.send(request)
-        responseBody  = live.body
-        response     <- IO {
+        live <- backend.send(request)
+        responseBody = live.body
+        response <- IO {
           live.code match {
             case StatusCode.Ok =>
               decode[LinksDataResponse](responseBody) match {
@@ -68,7 +68,7 @@ class GithubJob extends Job {
       backend.send(req).flatMap { resp =>
         if (resp.code == StatusCode.Ok)
           IO.fromEither(decode[NumberResponse](resp.body)
-              .leftMap(err => new Exception(s"Decode NumberResponse error: $err")))
+            .leftMap(err => new Exception(s"Decode NumberResponse error: $err")))
             .map(Some(_))
         else IO.pure(None)
       }
@@ -89,7 +89,8 @@ class GithubJob extends Job {
         case Some(chatIds) =>
           HttpClientCatsBackend.resource[IO]().use { backend =>
             val arrayChatIds = chatIds.mkString("[", ", ", "]")
-            val jsonBody = s"""{"id": ${chatIds.head}, "url": "$identifier","description": "string","tgChatsIds": $arrayChatIds}"""
+            val jsonBody =
+              s"""{"id": ${chatIds.head}, "url": "$identifier","description": "string","tgChatsIds": $arrayChatIds}"""
             IO.println(jsonBody)
             val updateChatReq = basicRequest
               .post(uri"http://localhost:4040/updates")
@@ -106,7 +107,11 @@ class GithubJob extends Job {
     }
   }
 
-  private def processGithubComments(identifier: String, comments: List[GithubComment], linksData: LinksDataResponse): IO[Unit] = {
+  private def processGithubComments(
+      identifier: String,
+      comments: List[GithubComment],
+      linksData: LinksDataResponse
+  ): IO[Unit] = {
     comments.lastOption match {
       case Some(comment) =>
         for {
@@ -115,7 +120,7 @@ class GithubJob extends Job {
               .toEither
               .leftMap(ex => new Exception(s"Ошибка парсинга created_at для $identifier: ${ex.getMessage}"))
           )
-          _ <- IO.println(s"Repo $identifier: новый timestamp = $newTimestamp")
+          _                        <- IO.println(s"Repo $identifier: новый timestamp = $newTimestamp")
           currentNumberResponseOpt <- fetchCurrentNumber(identifier)
           currentValue = currentNumberResponseOpt.map(_.value).getOrElse(0L)
           _ <- IO.println(s"Repo $identifier: текущее сохранённое значение = $currentValue")
@@ -142,8 +147,8 @@ class GithubJob extends Job {
     for {
       token     <- getToken
       linksData <- getLinks
-      _ <- IO.println("все ок")
-      _         <- linksData.data.keys.toList.traverse_ { identifier =>
+      _         <- IO.println("все ок")
+      _ <- linksData.data.keys.toList.traverse_ { identifier =>
         processSingleLink(identifier, token, linksData)
       }
     } yield ()

@@ -17,10 +17,10 @@ trait LinkRepository[F[_]] {
 }
 
 class LinkRepositoryImpl[F[_]: Sync](
-                                      ref: Ref[F, Map[Long, List[LinkResponse]]],
-                                      urlRef: Ref[F, Map[String, List[Long]]],
-                                      numberRef: Ref[F, Map[String, Long]]
-                                    ) extends LinkRepository[F] {
+    ref: Ref[F, Map[Long, List[LinkResponse]]],
+    urlRef: Ref[F, Map[String, List[Long]]],
+    numberRef: Ref[F, Map[String, Long]]
+) extends LinkRepository[F] {
 
   override def registerChat(chatId: Long): F[Unit] =
     ref.update { links =>
@@ -75,7 +75,10 @@ class LinkRepositoryImpl[F[_]: Sync](
               urlMap.get(url) match {
                 case Some(entries) =>
                   val updatedEntries = entries.filterNot(_ == chatId)
-                  (if (updatedEntries.isEmpty) urlMap - url else urlMap.updated(url, updatedEntries), updatedEntries.isEmpty)
+                  (
+                    if (updatedEntries.isEmpty) urlMap - url else urlMap.updated(url, updatedEntries),
+                    updatedEntries.isEmpty
+                  )
                 case None => (urlMap, false)
               }
             }
@@ -84,7 +87,6 @@ class LinkRepositoryImpl[F[_]: Sync](
         case None => Sync[F].unit
       }
     } yield result
-
 
   override def getUrlChatIds(url: String): F[Option[List[Long]]] =
     urlRef.get.map(_.get(url))

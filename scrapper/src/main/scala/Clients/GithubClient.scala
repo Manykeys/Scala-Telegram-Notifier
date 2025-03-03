@@ -3,11 +3,11 @@ package Clients
 import cats.effect.kernel.Async
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import io.circe.generic.auto.*
+import io.circe.parser.decode
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
 import sttp.client3.{asStringAlways, basicRequest}
 import sttp.model.Uri
-import io.circe.parser.decode
-import io.circe.generic.auto._
 
 case class GithubClient[F[_]: Async](token: String) {
 
@@ -17,11 +17,11 @@ case class GithubClient[F[_]: Async](token: String) {
     }
 
   private def getAllComments(
-                              backend: sttp.client3.SttpBackend[F, _],
-                              repo: String,
-                              page: Int,
-                              previousComments: Option[List[GithubComment]]
-                            ): F[List[GithubComment]] = {
+      backend: sttp.client3.SttpBackend[F, _],
+      repo: String,
+      page: Int,
+      previousComments: Option[List[GithubComment]]
+  ): F[List[GithubComment]] = {
     val url = s"https://api.github.com/repos/$repo/pulls/comments?per_page=100&page=$page"
 
     val request = basicRequest
@@ -36,12 +36,12 @@ case class GithubClient[F[_]: Async](token: String) {
       _        <- Async[F].delay(println(s"URL: $url"))
       _        <- Async[F].delay(println(s"Response JSON: ${response.body}"))
       comments <- Async[F].fromEither(decode[List[GithubComment]](response.body))
-      result   <- if (comments.nonEmpty) {
+      result <- if (comments.nonEmpty) {
         getAllComments(backend, repo, page + 1, Some(comments))
       } else {
         previousComments match {
           case Some(previous) => Async[F].pure(previous)
-          case None => Async[F].pure(List.empty)
+          case None           => Async[F].pure(List.empty)
         }
       }
     } yield result

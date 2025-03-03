@@ -1,13 +1,11 @@
 package bot
 
-import bot.TgBotApi.ErrorResponse
 import cats.effect.{ExitCode, IO, IOApp, Ref}
 import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
 import org.http4s.client.middleware.Logger
 import sttp.tapir.server.http4s.Http4sServerInterpreter
-import sttp.tapir.server.interceptor.decodefailure.DecodeFailureHandler
 import telegramium.bots.high.{Api, BotApi}
 
 object Application extends IOApp {

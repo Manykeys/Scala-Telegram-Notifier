@@ -5,15 +5,14 @@ import cats.effect.{Async, Ref}
 import cats.implicits.*
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
+import io.circe.*
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.*
-import io.circe.*
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
 import sttp.client3.{SttpBackend, UriContext, asStringAlways, basicRequest}
 import telegramium.bots.high.implicits.methodOps
 import telegramium.bots.high.{Api, LongPollBot}
 import telegramium.bots.{BotCommand, ChatIntId, Message}
-
 
 case class LinkResponse(id: Long, url: String, tags: List[String], filters: List[String])
 
@@ -37,22 +36,22 @@ sealed trait Command {
 
 object Command {
   case object Start extends Command {
-    val command = "/start"
+    val command     = "/start"
     val description = "Запуск бота"
   }
 
   case object List extends Command {
-    val command = "/list"
+    val command     = "/list"
     val description = "Список отслеживаемых ссылок"
   }
 
   case object Track extends Command {
-    val command = "/track"
+    val command     = "/track"
     val description = "Добавить ссылку для отслеживания (с тегами и фильтрами)"
   }
 
   case object Untrack extends Command {
-    val command = "/untrack"
+    val command     = "/untrack"
     val description = "Удалить ссылку из отслеживания"
   }
 
@@ -67,7 +66,6 @@ class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]])(implicit
     parallel: Parallel[F]
 ) extends LongPollBot[F](bot) {
   private val host = uri"http://localhost:8080"
-  
 
   override def onMessage(msg: Message): F[Unit] = {
     val chatId = msg.chat.id
@@ -105,8 +103,6 @@ class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]])(implicit
     }
   }
 
-
-
   // Метод обработки команды /track
   private def handleTrackCommand(chatId: Long, cmd: String): F[Unit] = {
     val link = cmd.stripPrefix("/track ").trim
@@ -143,7 +139,6 @@ class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]])(implicit
     val commands = Command.all.map(cmd => BotCommand(command = cmd.command, description = cmd.description))
     setMyCommands(commands).exec.void
   }
-
 
   private def withBackend[T](f: SttpBackend[F, Any] => F[T]): F[T] =
     HttpClientCatsBackend.resource[F]().use(f)
@@ -193,7 +188,6 @@ class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]])(implicit
             sendMessage(ChatIntId(chatId), "Ошибка! Соединение с Scrapper API не установлено").exec.void
         }
     }
-
 
   private def trackLinkComplete(chatId: Long, link: String, tags: List[String], filters: List[String]): F[Unit] =
     withBackend { backend =>

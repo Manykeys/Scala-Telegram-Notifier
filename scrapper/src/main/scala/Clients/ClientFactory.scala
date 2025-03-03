@@ -5,7 +5,7 @@ import cats.syntax.functor.*
 
 /** Общий результат запроса для комментариев */
 sealed trait CommentsResponse
-case class GithubCommentsResponse(comments: List[GithubComment]) extends CommentsResponse
+case class GithubCommentsResponse(comments: List[GithubComment])          extends CommentsResponse
 case class StackOverflowCommentsResponse(response: StackOverflowResponse) extends CommentsResponse
 
 /** Интерфейс для клиента, который умеет получать комментарии */

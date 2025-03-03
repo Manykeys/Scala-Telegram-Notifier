@@ -13,12 +13,12 @@ import tethys.{JsonObjectWriter, JsonReader, JsonWriter}
 object TgBotApi {
 
   case class ErrorResponse(
-                            description: String,
-                            code: String,
-                            exceptionName: String,
-                            exceptionMessage: String,
-                            stacktrace: List[String]
-                          )
+      description: String,
+      code: String,
+      exceptionName: String,
+      exceptionMessage: String,
+      stacktrace: List[String]
+  )
 
   implicit val errorResponseJsonWriter: JsonWriter[ErrorResponse] = JsonObjectWriter.derived
   implicit val errorResponseJsonReader: JsonReader[ErrorResponse] = JsonReader.derived
@@ -39,7 +39,7 @@ object TgBotApi {
 
 case class TgBotApi(bot: EchoBot[IO]) {
 
-  import TgBotApi._
+  import TgBotApi.*
 
   val updatesServerEndpoint: ServerEndpoint[Any, IO] = updatesEndpoint.serverLogic { request =>
     bot.update(request.tgChatsIds) *> IO.pure(Right("Ok"))

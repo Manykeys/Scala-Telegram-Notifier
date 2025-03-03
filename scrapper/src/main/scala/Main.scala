@@ -14,7 +14,7 @@ object Main extends IOApp:
       config       <- configLoader.load
       maybePort        = config.httpPort.toOption
       maybeGithubToken = config.githubToken.toOption
-      
+
       endpoints <- Endpoints.all
       routes = Http4sServerInterpreter[IO]().toRoutes(endpoints)
 

@@ -24,7 +24,7 @@ case class StackoverflowClient[F[_]: Async](token: String) {
       for {
         response <- backend.send(request)
         body = response.body
-        _ <- Async[F].delay(println(body))
+        _              <- Async[F].delay(println(body))
         parsedResponse <- Async[F].fromEither(decode[StackOverflowResponse](body))
       } yield parsedResponse
     }

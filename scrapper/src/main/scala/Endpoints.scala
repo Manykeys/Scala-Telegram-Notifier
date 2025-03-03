@@ -46,10 +46,10 @@ object Endpoints:
   implicit val linksDataResponseReader: JsonReader[LinksDataResponse]       = JsonReader.derived
   implicit val linksDataResponseWriter: JsonObjectWriter[LinksDataResponse] = JsonObjectWriter.derived
 
-  implicit val numberResponseReader: JsonReader[NumberResponse] = JsonReader.derived
+  implicit val numberResponseReader: JsonReader[NumberResponse]       = JsonReader.derived
   implicit val numberResponseWriter: JsonObjectWriter[NumberResponse] = JsonObjectWriter.derived
 
-  implicit val addNumberResponseReader: JsonReader[AddNumberRequest] = JsonReader.derived
+  implicit val addNumberResponseReader: JsonReader[AddNumberRequest]       = JsonReader.derived
   implicit val addNumberResponseWriter: JsonObjectWriter[AddNumberRequest] = JsonObjectWriter.derived
 
   def registerChatLogic(id: Long, repository: LinkRepository[IO]): IO[Either[ApiErrorResponse, Unit]] =
@@ -103,18 +103,18 @@ object Endpoints:
     }
 
   def addNumberLogic(
-                      request: AddNumberRequest,
-                      repository: LinkRepository[IO]
-                    ): IO[Either[ApiErrorResponse, NumberResponse]] =
+      request: AddNumberRequest,
+      repository: LinkRepository[IO]
+  ): IO[Either[ApiErrorResponse, NumberResponse]] =
     repository.addNumber(request.key, request.value) *> IO {
       println(s"Added number for key ${request.key}: ${request.value}")
       Right(NumberResponse(request.key, request.value))
     }
 
   def getNumberLogic(
-                      key: String,
-                      repository: LinkRepository[IO]
-                    ): IO[Either[ApiErrorResponse, NumberResponse]] =
+      key: String,
+      repository: LinkRepository[IO]
+  ): IO[Either[ApiErrorResponse, NumberResponse]] =
     repository.getNumber(key).map {
       case Some(value) =>
         println(s"Fetched number for key $key: $value")

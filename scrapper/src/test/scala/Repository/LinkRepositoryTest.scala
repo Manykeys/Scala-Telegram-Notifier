@@ -9,8 +9,8 @@ class LinkRepositoryTest extends CatsEffectSuite {
 
   test("should create a new repository and register a chat") {
     for {
-      repo <- LinkRepository.create[IO]
-      _ <- repo.registerChat(123)
+      repo  <- LinkRepository.create[IO]
+      _     <- repo.registerChat(123)
       links <- repo.getLinks(123)
     } yield {
       assertEquals(links, List.empty)
@@ -26,9 +26,9 @@ class LinkRepositoryTest extends CatsEffectSuite {
 
     for {
       repo <- LinkRepository.create[IO]
-      _ <- repo.registerChat(123)
+      _    <- repo.registerChat(123)
 
-      addedLinkOpt <- repo.addLink(123, addLinkRequest.link, addLinkRequest.tags, addLinkRequest.filters)
+      addedLinkOpt  <- repo.addLink(123, addLinkRequest.link, addLinkRequest.tags, addLinkRequest.filters)
       linksAfterAdd <- repo.getLinks(123)
     } yield {
       assert(addedLinkOpt.isDefined)
