@@ -48,6 +48,9 @@ object Dependencies {
   val telegramiumCore = "io.github.apimorphism" %% "telegramium-core" % "9.803.0"
   val telegramiumHigh = "io.github.apimorphism" %% "telegramium-high" % "9.803.0"
 
+  val testLib = "org.scalatest" %% "scalatest" % "3.2.17" % Test
+  val plus = "org.scalatestplus" %% "mockito-5-10" % "3.2.18.0" % Test
+  val mock = "org.scalamock" %% "scalamock" % "6.0.0" % Test
   val allDeps: Seq[ModuleID] = Seq(
     catsCore,
     catsEffect,
@@ -68,6 +71,9 @@ object Dependencies {
     pureConfigGeneric,
     quartz,
     telegramiumCore,
-    telegramiumHigh
+    telegramiumHigh,
+    testLib,
+    plus,
+    mock
   )
 }

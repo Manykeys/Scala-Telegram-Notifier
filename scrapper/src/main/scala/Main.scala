@@ -20,7 +20,7 @@ object Main extends IOApp:
 
       port <- maybePort match {
         case Some(p) => IO.pure(p)
-        case None    => IO.raiseError(new RuntimeException("HTTP_PORT is missing or invalid"))
+        case None    => IO.raiseError(new RuntimeException("API_PORT is missing or invalid"))
       }
 
       githubToken <- maybeGithubToken match {

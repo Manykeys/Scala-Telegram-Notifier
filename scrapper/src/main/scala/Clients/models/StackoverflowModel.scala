@@ -1,6 +1,8 @@
 package Clients
 
+import io.circe.{Decoder, Encoder}
 import io.circe.generic.auto.*
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 
 case class Owner(
     account_id: Int,
@@ -11,6 +13,12 @@ case class Owner(
     display_name: String,
     link: String
 )
+
+object Owner {
+  implicit val githubCommentDecoder: Decoder[Owner] = deriveDecoder[Owner]
+  implicit val githubCommentEncoder: Encoder[Owner] = deriveEncoder[Owner]
+}
+
 
 case class Answer(
     owner: Owner,
@@ -24,9 +32,19 @@ case class Answer(
     content_license: String
 )
 
+object Answer {
+  implicit val githubCommentDecoder: Decoder[Answer] = deriveDecoder[Answer]
+  implicit val githubCommentEncoder: Encoder[Answer] = deriveEncoder[Answer]
+}
+
 case class StackOverflowResponse(
     items: List[Answer],
     has_more: Boolean,
     quota_max: Int,
     quota_remaining: Int
 )
+
+object StackOverflowResponse {
+  implicit val githubCommentDecoder: Decoder[StackOverflowResponse] = deriveDecoder[StackOverflowResponse]
+  implicit val githubCommentEncoder: Encoder[StackOverflowResponse] = deriveEncoder[StackOverflowResponse]
+}

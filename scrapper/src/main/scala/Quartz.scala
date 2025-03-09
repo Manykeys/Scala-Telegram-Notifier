@@ -9,7 +9,7 @@ import org.quartz.impl.StdSchedulerFactory
 import scrapper.Endpoints.{AddNumberRequest, LinksDataResponse, NumberResponse}
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
 import sttp.client3.{UriContext, asStringAlways, basicRequest, emptyRequest}
-import sttp.model.StatusCode
+import sttp.model.{StatusCode, Uri}
 import tethys.JsonWriterOps
 import tethys.jackson.*
 
@@ -19,21 +19,33 @@ import scala.util.Try
 case class Comment(created_at: String)
 
 class GithubJob extends Job {
-
-  override def execute(context: JobExecutionContext): Unit = {
-    processLinks.handleErrorWith { err =>
-      IO.println(s"Ошибка выполнения GithubJob: ${err.getMessage}")
-    }.unsafeRunSync()
-  }
+  private def getEnvInt(name: String): IO[Int] =
+    IO(sys.env.get(name)).flatMap {
+      case Some(value) =>
+        IO.fromTry(Try(value.toInt)).handleErrorWith { _ =>
+          IO.raiseError(new RuntimeException(s"Переменная окружения $name имеет некорректный формат: '$value'"))
+        }
+      case None =>
+        IO.raiseError(new RuntimeException(s"Переменная окружения $name не найдена"))
+    }
 
   private def getToken: IO[String] = IO.fromOption(sys.env.get("GITHUB_TOKEN"))(
     new RuntimeException("Переменная окружения GITHUB_TOKEN не найдена")
   )
 
-  private def getLinks: IO[LinksDataResponse] = {
+  private def buildUri(str: String): IO[Uri] =
+    IO.fromEither(Uri.parse(str).left.map(err => new RuntimeException(s"Некорректный URI '$str': $err")))
+
+  override def execute(context: JobExecutionContext): Unit = {
+    processLinks.handleErrorWith { err =>
+      IO.raiseError(new Exception(s"Ошибка выполнения GithubJob: ${err.getMessage}"))
+    }.unsafeRunSync()
+  }
+
+  private def getLinks(apiUri: Uri): IO[LinksDataResponse] = {
     HttpClientCatsBackend.resource[IO]().use { backend =>
       val request = emptyRequest
-        .get(uri"http://localhost:8080/links/all")
+        .get(apiUri.addPath("links").addPath("all"))
         .response(asStringAlways)
       for {
         live <- backend.send(request)
@@ -60,25 +72,30 @@ class GithubJob extends Job {
     }
   }
 
-  private def fetchCurrentNumber(identifier: String): IO[Option[NumberResponse]] = {
+  private def fetchCurrentNumber(apiUri: Uri, identifier: String): IO[Option[NumberResponse]] = {
     HttpClientCatsBackend.resource[IO]().use { backend =>
-      val req = basicRequest
-        .get(uri"http://localhost:8080/number/$identifier")
-        .response(asStringAlways)
+      val uri = apiUri.addPath("number").addPath(identifier)
+      val req = basicRequest.get(uri).response(asStringAlways)
       backend.send(req).flatMap { resp =>
         if (resp.code == StatusCode.Ok)
           IO.fromEither(decode[NumberResponse](resp.body)
-            .leftMap(err => new Exception(s"Decode NumberResponse error: $err")))
+              .leftMap(err => new Exception(s"Decode NumberResponse error: $err")))
             .map(Some(_))
         else IO.pure(None)
       }
     }
   }
 
-  private def updateNumberAndNotify(identifier: String, newTimestamp: Long, linksData: LinksDataResponse): IO[Unit] = {
+  private def updateNumberAndNotify(
+                                     apiUri: Uri,
+                                     tgUri: Uri,
+                                     identifier: String,
+                                     newTimestamp: Long,
+                                     linksData: LinksDataResponse
+                                   ): IO[Unit] = {
     HttpClientCatsBackend.resource[IO]().use { backend =>
       val updateReq = basicRequest
-        .post(uri"http://localhost:8080/number")
+        .post(apiUri.addPath("number"))
         .body(AddNumberRequest(identifier, newTimestamp).asJson)
         .response(asStringAlways)
       backend.send(updateReq).flatMap { resp =>
@@ -93,7 +110,7 @@ class GithubJob extends Job {
               s"""{"id": ${chatIds.head}, "url": "$identifier","description": "string","tgChatsIds": $arrayChatIds}"""
             IO.println(jsonBody)
             val updateChatReq = basicRequest
-              .post(uri"http://localhost:4040/updates")
+              .post(tgUri.addPath("updates"))
               .body(jsonBody)
               .contentType("application/json")
               .response(asStringAlways)
@@ -108,10 +125,12 @@ class GithubJob extends Job {
   }
 
   private def processGithubComments(
-      identifier: String,
-      comments: List[GithubComment],
-      linksData: LinksDataResponse
-  ): IO[Unit] = {
+                                     apiUri: Uri,
+                                     tgUri: Uri,
+                                     identifier: String,
+                                     comments: List[GithubComment],
+                                     linksData: LinksDataResponse
+                                   ): IO[Unit] = {
     comments.lastOption match {
       case Some(comment) =>
         for {
@@ -120,12 +139,12 @@ class GithubJob extends Job {
               .toEither
               .leftMap(ex => new Exception(s"Ошибка парсинга created_at для $identifier: ${ex.getMessage}"))
           )
-          _                        <- IO.println(s"Repo $identifier: новый timestamp = $newTimestamp")
-          currentNumberResponseOpt <- fetchCurrentNumber(identifier)
+          _ <- IO.println(s"Repo $identifier: новый timestamp = $newTimestamp")
+          currentNumberResponseOpt <- fetchCurrentNumber(apiUri, identifier)
           currentValue = currentNumberResponseOpt.map(_.value).getOrElse(0L)
           _ <- IO.println(s"Repo $identifier: текущее сохранённое значение = $currentValue")
           _ <- if (newTimestamp != currentValue) {
-            updateNumberAndNotify(identifier, newTimestamp, linksData)
+            updateNumberAndNotify(apiUri, tgUri, identifier, newTimestamp, linksData)
           } else IO.println(s"Для репозитория $identifier обновление не требуется")
         } yield ()
       case None =>
@@ -133,27 +152,41 @@ class GithubJob extends Job {
     }
   }
 
-  private def processSingleLink(identifier: String, token: String, linksData: LinksDataResponse): IO[Unit] = {
-    val commentsClient = CommentsClientFactory.create[IO](token, identifier)
-    commentsClient.getComments(identifier, Some(0)).flatMap {
-      case GithubCommentsResponse(comments) =>
-        IO.println("shit") *> processGithubComments(identifier, comments, linksData)
-      case StackOverflowCommentsResponse(response) =>
-        IO.println(s"StackOverflow response for $identifier: $response")
+  private def processSingleLink(
+                                 apiUri: Uri,
+                                 tgUri: Uri,
+                                 identifier: String,
+                                 token: String,
+                                 linksData: LinksDataResponse
+                               ): IO[Unit] = {
+    HttpClientCatsBackend.resource[IO]().use { backend =>
+      val commentsClient = CommentsClientFactory.create[IO](token, identifier, backend)
+
+      commentsClient.getComments(identifier, Some(0)).flatMap {
+        case GithubCommentsResponse(comments) =>
+          processGithubComments(apiUri, tgUri, identifier, comments, linksData)
+        case StackOverflowCommentsResponse(response) =>
+          IO.println(s"StackOverflow response for $identifier: $response")
+      }
     }
   }
 
   private def processLinks: IO[Unit] = {
     for {
+      apiPort <- getEnvInt("APIPORT")
+      tgPort  <- getEnvInt("TGPORT")
+      apiUri  <- buildUri(s"http://localhost:$apiPort")
+      tgUri   <- buildUri(s"http://localhost:$tgPort")
       token     <- getToken
-      linksData <- getLinks
+      linksData <- getLinks(apiUri)
       _         <- IO.println("все ок")
       _ <- linksData.data.keys.toList.traverse_ { identifier =>
-        processSingleLink(identifier, token, linksData)
+        processSingleLink(apiUri, tgUri, identifier, token, linksData)
       }
     } yield ()
   }
 }
+
 
 object QuartzApp extends IOApp.Simple {
 

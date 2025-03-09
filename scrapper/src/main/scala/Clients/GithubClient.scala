@@ -5,23 +5,20 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import io.circe.generic.auto.*
 import io.circe.parser.decode
-import sttp.client3.httpclient.cats.HttpClientCatsBackend
-import sttp.client3.{asStringAlways, basicRequest}
+import sttp.client3.{SttpBackend, asStringAlways, basicRequest}
 import sttp.model.Uri
 
-case class GithubClient[F[_]: Async](token: String) {
+case class GithubClient[F[_]: Async, B <: SttpBackend[F, _]](token: String) {
 
-  def getComments(repo: String): F[List[GithubComment]] =
-    HttpClientCatsBackend.resource[F]().use { backend =>
-      getAllComments(backend, repo, 1, None)
-    }
+  def getComments(repo: String, backend: B): F[List[GithubComment]] =
+    getAllComments(backend, repo, 1, None)
 
-  private def getAllComments(
-      backend: sttp.client3.SttpBackend[F, _],
-      repo: String,
-      page: Int,
-      previousComments: Option[List[GithubComment]]
-  ): F[List[GithubComment]] = {
+  def getAllComments(
+                      backend: B,
+                      repo: String,
+                      page: Int,
+                      previousComments: Option[List[GithubComment]]
+                    ): F[List[GithubComment]] = {
     val url = s"https://api.github.com/repos/$repo/pulls/comments?per_page=100&page=$page"
 
     val request = basicRequest

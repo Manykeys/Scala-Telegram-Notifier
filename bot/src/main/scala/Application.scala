@@ -11,21 +11,28 @@ import telegramium.bots.high.{Api, BotApi}
 object Application extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     BlazeClientBuilder[IO].resource.use { httpClient =>
-      val http                           = Logger(logBody = false, logHeaders = false)(httpClient)
-      val token                          = sys.env("TGTOKEN")
-      implicit val api: Api[IO]          = createBotBackend(http, token)
-      implicit val httpClien: Client[IO] = httpClient
       Ref.of[IO, Map[Long, PendingTrack]](Map.empty).flatMap {
         ref =>
-          val echoBot = new EchoBot[IO](ref)
-          val botApi  = TgBotApi(echoBot)
-
           for {
+            http <- IO(Logger(logBody = false, logHeaders = false)(httpClient))
+            token <- IO.fromOption(sys.env.get("TGTOKEN"))(
+              new RuntimeException("Переменная окружения TGTOKEN не найдена")
+            )
+            port <- IO.fromOption(sys.env.get("TGPORT"))(
+              new RuntimeException("Переменная окружения TGPORT не найдена")
+            )
+            apiPort <- IO.fromOption(sys.env.get("APIPORT").map(_.toInt))(
+              new RuntimeException("Переменная окружения APIPORT не найдена")
+            )
+            api: Api[IO] <- IO(createBotBackend(http, token))
+            client  = httpClient
+            echoBot = new EchoBot[IO](ref, apiPort)(api, IO.asyncForIO, IO.parallelForIO)
+            botApi  = TgBotApi(echoBot)
             _        <- echoBot.setMyCommands2()
             botFiber <- echoBot.start().start
             server = Http4sServerInterpreter[IO]().toRoutes(botApi.all)
             exitCode <- BlazeServerBuilder[IO]
-              .bindHttp(sys.env("PORT").toInt, "0.0.0.0")
+              .bindHttp(port.toInt, "0.0.0.0")
               .withHttpApp(server.orNotFound)
               .resource
               .use(_ => botFiber.join)

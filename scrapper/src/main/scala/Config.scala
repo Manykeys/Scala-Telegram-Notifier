@@ -14,10 +14,10 @@ object ConfigLoader {
   def make[F[_]: Sync]: F[ConfigLoader[F]] = Sync[F].pure(new ConfigLoader[F] {
     override def load: F[Config] = for {
       port <- Sync[F].delay {
-        sys.env.get("HTTP_PORT")
+        sys.env.get("API_PORT")
           .flatMap(_.toIntOption)
           .flatMap(Port.fromInt)
-          .toRight(new RuntimeException("HTTP_PORT is missing or invalid"))
+          .toRight(new RuntimeException("API_PORT is missing or invalid"))
       }
       githubToken <- Sync[F].delay {
         sys.env.get("GITHUB_TOKEN")
