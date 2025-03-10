@@ -14,11 +14,11 @@ case class GithubClient[F[_]: Async, B <: SttpBackend[F, _]](token: String) {
     getAllComments(backend, repo, 1, None)
 
   def getAllComments(
-                      backend: B,
-                      repo: String,
-                      page: Int,
-                      previousComments: Option[List[GithubComment]]
-                    ): F[List[GithubComment]] = {
+      backend: B,
+      repo: String,
+      page: Int,
+      previousComments: Option[List[GithubComment]]
+  ): F[List[GithubComment]] = {
     val url = s"https://api.github.com/repos/$repo/pulls/comments?per_page=100&page=$page"
 
     val request = basicRequest

@@ -12,3 +12,4 @@
 Проект состоит из 2-х приложений:
 * Bot
 * Scrapper
+![alt text](945D828E-41D0-4C9B-8A13-1CCC3FA9FC63.jpeg)

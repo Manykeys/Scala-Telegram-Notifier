@@ -71,7 +71,9 @@ class GithubJob extends Job {
         }
       } yield response
     }.handleErrorWith { error =>
-      IO.pure(logger.info(s"Ошибка при выполнении запроса: ${error.getMessage}")) *> IO.pure(LinksDataResponse(Map.empty))
+      IO.pure(logger.info(s"Ошибка при выполнении запроса: ${error.getMessage}")) *> IO.pure(
+        LinksDataResponse(Map.empty)
+      )
     }
   }
 
@@ -82,7 +84,7 @@ class GithubJob extends Job {
       backend.send(req).flatMap { resp =>
         if (resp.code == StatusCode.Ok)
           IO.fromEither(decode[NumberResponse](resp.body)
-              .leftMap(err => new Exception(s"Decode NumberResponse error: $err")))
+            .leftMap(err => new Exception(s"Decode NumberResponse error: $err")))
             .map(Some(_))
         else IO.pure(None)
       }
@@ -90,12 +92,12 @@ class GithubJob extends Job {
   }
 
   private def updateNumberAndNotify(
-                                     apiUri: Uri,
-                                     tgUri: Uri,
-                                     identifier: String,
-                                     newTimestamp: Long,
-                                     linksData: LinksDataResponse
-                                   ): IO[Unit] = {
+      apiUri: Uri,
+      tgUri: Uri,
+      identifier: String,
+      newTimestamp: Long,
+      linksData: LinksDataResponse
+  ): IO[Unit] = {
     HttpClientCatsBackend.resource[IO]().use { backend =>
       val updateReq = basicRequest
         .post(apiUri.addPath("number"))
@@ -128,12 +130,12 @@ class GithubJob extends Job {
   }
 
   private def processGithubComments(
-                                     apiUri: Uri,
-                                     tgUri: Uri,
-                                     identifier: String,
-                                     comments: List[GithubComment],
-                                     linksData: LinksDataResponse
-                                   ): IO[Unit] = {
+      apiUri: Uri,
+      tgUri: Uri,
+      identifier: String,
+      comments: List[GithubComment],
+      linksData: LinksDataResponse
+  ): IO[Unit] = {
     comments.lastOption match {
       case Some(comment) =>
         for {
@@ -142,7 +144,7 @@ class GithubJob extends Job {
               .toEither
               .leftMap(ex => new Exception(s"Ошибка парсинга created_at для $identifier: ${ex.getMessage}"))
           )
-          _ <- IO.pure(logger.info(s"Repo $identifier: новый timestamp = $newTimestamp"))
+          _                        <- IO.pure(logger.info(s"Repo $identifier: новый timestamp = $newTimestamp"))
           currentNumberResponseOpt <- fetchCurrentNumber(apiUri, identifier)
           currentValue = currentNumberResponseOpt.map(_.value).getOrElse(0L)
           _ <- IO.pure(logger.info(s"Repo $identifier: текущее сохранённое значение = $currentValue"))
@@ -156,12 +158,12 @@ class GithubJob extends Job {
   }
 
   private def processSingleLink(
-                                 apiUri: Uri,
-                                 tgUri: Uri,
-                                 identifier: String,
-                                 token: String,
-                                 linksData: LinksDataResponse
-                               ): IO[Unit] = {
+      apiUri: Uri,
+      tgUri: Uri,
+      identifier: String,
+      token: String,
+      linksData: LinksDataResponse
+  ): IO[Unit] = {
     HttpClientCatsBackend.resource[IO]().use { backend =>
       val commentsClient = CommentsClientFactory.create[IO](token, identifier, backend)
 
@@ -176,10 +178,10 @@ class GithubJob extends Job {
 
   private def processLinks: IO[Unit] = {
     for {
-      apiPort <- getEnvInt("APIPORT")
-      tgPort  <- getEnvInt("TGPORT")
-      apiUri  <- buildUri(s"http://localhost:$apiPort")
-      tgUri   <- buildUri(s"http://localhost:$tgPort")
+      apiPort   <- getEnvInt("APIPORT")
+      tgPort    <- getEnvInt("TGPORT")
+      apiUri    <- buildUri(s"http://localhost:$apiPort")
+      tgUri     <- buildUri(s"http://localhost:$tgPort")
       token     <- getToken
       linksData <- getLinks(apiUri)
       _ <- linksData.data.keys.toList.traverse_ { identifier =>
@@ -188,7 +190,6 @@ class GithubJob extends Job {
     } yield ()
   }
 }
-
 
 object QuartzApp extends IOApp.Simple {
 

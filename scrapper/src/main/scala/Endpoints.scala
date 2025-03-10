@@ -1,6 +1,7 @@
 package scrapper
 
 import cats.effect.IO
+import org.slf4j.{Logger, LoggerFactory}
 import scrapper.repository.LinkRepository
 import sttp.tapir.*
 import sttp.tapir.generic.auto.*
@@ -10,7 +11,6 @@ import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import tethys.readers.tokens.TokenIterator
 import tethys.writers.tokens.TokenWriter
 import tethys.{JsonObjectWriter, JsonReader, JsonWriter, readers}
-import org.slf4j.{Logger, LoggerFactory}
 
 object Endpoints:
   val logger: Logger = LoggerFactory.getLogger(getClass)

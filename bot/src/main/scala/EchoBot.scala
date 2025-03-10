@@ -62,12 +62,17 @@ object Command {
 case class PendingTrack(link: String, tags: Option[List[String]] = None, filters: Option[List[String]] = None)
 
 case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: Int)(implicit
-                                                                                    bot: Api[F],
-                                                                                    asyncF: Async[F],
-                                                                                    parallel: Parallel[F]
+    bot: Api[F],
+    asyncF: Async[F],
+    parallel: Parallel[F]
 ) extends LongPollBot[F](bot) {
-  private val link = s"http://localhost:$apiPort"
-  private val host: Uri = Uri.parse(link).toOption.get
+
+  private val linka: String = s"http://localhost:$apiPort"
+
+  def getHost[F[_]: Async]: F[Uri] = {
+    Async[F].fromEither(Uri.parse(linka).leftMap(e => new Throwable(s"Invalid URL: $linka")))
+  }
+
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def onMessage(msg: Message): F[Unit] = {
@@ -145,46 +150,81 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
 
   def registerChat(chatId: Long): F[String] = {
     logger.info(s"Регистрация чата: $chatId")
-    apiPost(host.addPath("tg-chat", chatId.toString), chatId, "Чат зарегистрирован!", "Ошибка регистрации чата.")
+    getHost.flatMap(host =>
+      apiPost(host.addPath("tg-chat", chatId.toString), chatId, "Чат зарегистрирован!", "Ошибка регистрации чата.")
+    )
   }
 
   def update(chatIds: List[Long]): F[Unit] =
     chatIds.traverse_(id => sendMessage(id, "победа"))
 
   def listLinks(chatId: Long): F[String] =
-    getDecodedResponse[ListLinksResponse](host.addPath("links"), chatId).flatMap {
-      case Right(listResponse) =>
-        val urls = listResponse.links.map(_.url)
-        val message =
-          if (urls.isEmpty) "Нет отслеживаемых ссылок."
-          else s"Отслеживаемые ссылки:\n${urls.mkString("\n")}"
-        Async[F].pure(message)
-      case Left(error) =>
-        Async[F].pure(s"Ошибка при получении списка ссылок: $error")
-    }
+    getHost.flatMap(host =>
+      getDecodedResponse[ListLinksResponse](host.addPath("links"), chatId).flatMap {
+        case Right(listResponse) =>
+          val urls = listResponse.links.map(_.url)
+          val message =
+            if (urls.isEmpty) "Нет отслеживаемых ссылок."
+            else s"Отслеживаемые ссылки:\n${urls.mkString("\n")}"
+          Async[F].pure(message)
+        case Left(error) =>
+          Async[F].pure(s"Ошибка при получении списка ссылок: $error")
+      }
+    )
 
   def trackLinkComplete(chatId: Long, link: String, tags: List[String], filters: List[String]): F[String] =
-    apiPost(
-      host.addPath("links"),
-      chatId,
-      s"Ссылка добавлена: $link",
-      "Ошибка при добавлении ссылки.",
-      Some(Json.obj("link" -> link.asJson, "tags" -> tags.asJson, "filters" -> filters.asJson).noSpaces)
+    getHost.flatMap(host =>
+      apiPost(
+        host.addPath("links"),
+        chatId,
+        s"Ссылка добавлена: $link",
+        "Ошибка при добавлении ссылки.",
+        Some(Json.obj("link" -> link.asJson, "tags" -> tags.asJson, "filters" -> filters.asJson).noSpaces)
+      )
     )
 
   def untrackLink(chatId: Long, link: String): F[String] =
-    apiDelete(host.addPath("links"), chatId, s"Ссылка удалена: $link", "Ошибка при удалении ссылки.", Some(Json.obj("link" -> link.asJson).noSpaces))
+    getHost.flatMap(host =>
+      apiDelete(
+        host.addPath("links"),
+        chatId,
+        s"Ссылка удалена: $link",
+        "Ошибка при удалении ссылки.",
+        Some(Json.obj("link" -> link.asJson).noSpaces)
+      )
+    )
 
   def apiGet(uri: Uri, chatId: Long, successMsg: String, errorMsg: String): F[String] =
-    apiRequest(basicRequest.get(uri).header("Tg-Chat-Id", chatId.toString), chatId, successMsg, errorMsg)
+    getHost.flatMap(host =>
+      apiRequest(basicRequest.get(uri).header("Tg-Chat-Id", chatId.toString), chatId, successMsg, errorMsg)
+    )
 
   def apiPost(uri: Uri, chatId: Long, successMsg: String, errorMsg: String, body: Option[String] = None): F[String] =
-    apiRequest(basicRequest.post(uri).header("Tg-Chat-Id", chatId.toString).body(body.getOrElse("")), chatId, successMsg, errorMsg)
+    getHost.flatMap(host =>
+      apiRequest(
+        basicRequest.post(uri).header("Tg-Chat-Id", chatId.toString).body(body.getOrElse("")),
+        chatId,
+        successMsg,
+        errorMsg
+      )
+    )
 
   def apiDelete(uri: Uri, chatId: Long, successMsg: String, errorMsg: String, body: Option[String] = None): F[String] =
-    apiRequest(basicRequest.delete(uri).header("Tg-Chat-Id", chatId.toString).body(body.getOrElse("")), chatId, successMsg, errorMsg)
+    getHost.flatMap(host =>
+      apiRequest(
+        basicRequest.delete(uri).header("Tg-Chat-Id", chatId.toString).body(body.getOrElse("")),
+        chatId,
+        successMsg,
+        errorMsg
+      )
+    )
 
-  def apiRequest(request: sttp.client3.RequestT[sttp.client3.Identity, Either[String, String], Any], chatId: Long, successMsg: String, errorMsg: String): F[String] =
+  def apiRequest(
+      request: sttp.client3.RequestT[sttp.client3.Identity, Either[String, String], Any],
+      chatId: Long,
+      successMsg: String,
+      errorMsg: String
+  ): F[String] =
     withBackend { backend =>
       request.response(asStringAlways)
         .send(backend)

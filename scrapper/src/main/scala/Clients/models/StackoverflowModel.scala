@@ -1,8 +1,8 @@
 package Clients
 
-import io.circe.{Decoder, Encoder}
 import io.circe.generic.auto.*
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.{Decoder, Encoder}
 
 case class Owner(
     account_id: Int,
@@ -18,7 +18,6 @@ object Owner {
   implicit val githubCommentDecoder: Decoder[Owner] = deriveDecoder[Owner]
   implicit val githubCommentEncoder: Encoder[Owner] = deriveEncoder[Owner]
 }
-
 
 case class Answer(
     owner: Owner,

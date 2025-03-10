@@ -37,9 +37,9 @@ object Main extends IOApp:
         .build
         .use: server =>
           for {
-             _ <- IO(logger.info(
-          s"Go to http://localhost:${server.address.getPort}/docs to open SwaggerUI. Press ENTER key to exit."
-          ))
-            _ <- IO.readLine}
-          yield ()
+            _ <- IO(logger.info(
+              s"Go to http://localhost:${server.address.getPort}/docs to open SwaggerUI. Press ENTER key to exit."
+            ))
+            _ <- IO.readLine
+          } yield ()
     } yield ExitCode.Success

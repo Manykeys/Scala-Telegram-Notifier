@@ -7,7 +7,7 @@ import sttp.client3.impl.cats.CatsMonadError
 import sttp.client3.testing.SttpBackendStub
 
 class ClientFactorySpec extends CatsEffectSuite {
-  val monad = new CatsMonadError[IO]
+  val monad                             = new CatsMonadError[IO]
   val stubBackend: SttpBackend[IO, Any] = SttpBackendStub[IO, Any](monad)
 
   test("CommentsClientFactory should return Github client for repo identifier") {

@@ -36,28 +36,29 @@ class EchoBotSpec extends CatsEffectSuite {
   private val hostBase = "http://localhost:8080"
 
   test("registerChat отправляет корректный POST запрос") {
-    val chatId = 1L
+    val chatId      = 1L
     val expectedUrl = s"$hostBase/tg-chat/$chatId"
 
     val monad = new CatsMonadError[IO]
     val stub = SttpBackendStub[IO, Any](monad)
       .whenRequestMatchesPartial {
-        case req if req.uri.toString == expectedUrl &&
-          req.method == Method.POST &&
-          hasChatHeader(req, chatId) &&
-          extractStringBody(req).contains("") =>
+        case req
+            if req.uri.toString == expectedUrl &&
+              req.method == Method.POST &&
+              hasChatHeader(req, chatId) &&
+              extractStringBody(req).contains("") =>
           Response.ok("{}")
       }
 
     for {
-      ref    <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
-      bot     = new TestHttpEchoBot(ref, stub, 8080)
+      ref <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
+      bot = new TestHttpEchoBot(ref, stub, 8080)
       result <- bot.registerChat(chatId)
     } yield assertEquals(result, "Чат зарегистрирован!")
   }
 
   test("listLinks возвращает корректное сообщение для непустого списка") {
-    val chatId = 1L
+    val chatId      = 1L
     val expectedUrl = s"$hostBase/links"
     val jsonResponse =
       """{
@@ -75,9 +76,10 @@ class EchoBotSpec extends CatsEffectSuite {
     val monad = new CatsMonadError[IO]
     val stub = SttpBackendStub[IO, Any](monad)
       .whenRequestMatchesPartial {
-        case req if req.uri.toString == expectedUrl &&
-          req.method == Method.GET &&
-          hasChatHeader(req, chatId) =>
+        case req
+            if req.uri.toString == expectedUrl &&
+              req.method == Method.GET &&
+              hasChatHeader(req, chatId) =>
           Response.ok(jsonResponse)
       }
 
@@ -87,8 +89,6 @@ class EchoBotSpec extends CatsEffectSuite {
       result <- bot.listLinks(chatId)
     } yield assertEquals(result, "Отслеживаемые ссылки:\nhttps://github.com/owner/repo")
   }
-
-
 
   test("trackLinkComplete отправляет корректный POST запрос с JSON телом") {
     val chatId      = 1L
@@ -100,23 +100,24 @@ class EchoBotSpec extends CatsEffectSuite {
     val monad = new CatsMonadError[IO]
     val stub = SttpBackendStub[IO, Any](monad)
       .whenRequestMatchesPartial {
-        case req if req.uri.toString == expectedUrl &&
-          req.method == Method.POST &&
-          hasChatHeader(req, chatId) &&
-          extractStringBody(req).exists { body =>
-            parser.parse(body).toOption.exists { json =>
-              val cursor = json.hcursor
-              cursor.get[String]("link").toOption.contains(link) &&
-                cursor.get[List[String]]("tags").toOption.exists(ts => ts.sorted == tags.sorted) &&
-                cursor.get[List[String]]("filters").toOption.exists(fs => fs.sorted == filters.sorted)
-            }
-          } =>
+        case req
+            if req.uri.toString == expectedUrl &&
+              req.method == Method.POST &&
+              hasChatHeader(req, chatId) &&
+              extractStringBody(req).exists { body =>
+                parser.parse(body).toOption.exists { json =>
+                  val cursor = json.hcursor
+                  cursor.get[String]("link").toOption.contains(link) &&
+                  cursor.get[List[String]]("tags").toOption.exists(ts => ts.sorted == tags.sorted) &&
+                  cursor.get[List[String]]("filters").toOption.exists(fs => fs.sorted == filters.sorted)
+                }
+              } =>
           Response.ok("{}")
       }
 
     for {
-      ref    <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
-      bot     = new TestHttpEchoBot(ref, stub, 8080)
+      ref <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
+      bot = new TestHttpEchoBot(ref, stub, 8080)
       result <- bot.trackLinkComplete(chatId, link, tags, filters)
     } yield assertEquals(result, s"Ссылка добавлена: $link")
   }
@@ -129,20 +130,21 @@ class EchoBotSpec extends CatsEffectSuite {
     val monad = new CatsMonadError[IO]
     val stub = SttpBackendStub[IO, Any](monad)
       .whenRequestMatchesPartial {
-        case req if req.uri.toString == expectedUrl &&
-          req.method == Method.DELETE &&
-          hasChatHeader(req, chatId) &&
-          extractStringBody(req).exists { body =>
-            parser.parse(body).toOption.exists { json =>
-              json.hcursor.get[String]("link").toOption.contains(link)
-            }
-          } =>
+        case req
+            if req.uri.toString == expectedUrl &&
+              req.method == Method.DELETE &&
+              hasChatHeader(req, chatId) &&
+              extractStringBody(req).exists { body =>
+                parser.parse(body).toOption.exists { json =>
+                  json.hcursor.get[String]("link").toOption.contains(link)
+                }
+              } =>
           Response.ok("{}")
       }
 
     for {
-      ref    <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
-      bot     = new TestHttpEchoBot(ref, stub, 8080)
+      ref <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
+      bot = new TestHttpEchoBot(ref, stub, 8080)
       result <- bot.untrackLink(chatId, link)
     } yield assertEquals(result, s"Ссылка удалена: $link")
   }

@@ -5,9 +5,9 @@ import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
 import org.http4s.client.middleware.Logger
+import org.slf4j.LoggerFactory
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 import telegramium.bots.high.{Api, BotApi}
-import org.slf4j.LoggerFactory
 
 object Application extends IOApp {
 
@@ -36,7 +36,7 @@ object Application extends IOApp {
           _ <- IO(logger.info("Setting bot commands"))
           _ <- echoBot.setMyCommands2()
 
-          _ <- IO(logger.info("Starting bot"))
+          _        <- IO(logger.info("Starting bot"))
           botFiber <- echoBot.start().start
 
           server = Http4sServerInterpreter[IO]().toRoutes(botApi.all)
@@ -51,8 +51,8 @@ object Application extends IOApp {
     }
 
   /** @param token
-   *   Bot API token got from Botfather
-   */
+    *   Bot API token got from Botfather
+    */
   private def createBotBackend(http: Client[IO], token: String) =
     BotApi(http, baseUrl = s"https://api.telegram.org/bot$token")
 

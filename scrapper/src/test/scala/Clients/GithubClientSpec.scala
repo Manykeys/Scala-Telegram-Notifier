@@ -1,11 +1,11 @@
 package Clients
 
 import cats.effect.IO
+import io.circe.syntax.*
 import munit.CatsEffectSuite
 import sttp.client3.Response
 import sttp.client3.impl.cats.CatsMonadError
 import sttp.client3.testing.SttpBackendStub
-import io.circe.syntax._
 
 class GithubClientSpec extends CatsEffectSuite {
 
