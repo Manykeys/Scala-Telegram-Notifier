@@ -10,8 +10,10 @@ import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import tethys.readers.tokens.TokenIterator
 import tethys.writers.tokens.TokenWriter
 import tethys.{JsonObjectWriter, JsonReader, JsonWriter, readers}
+import org.slf4j.{Logger, LoggerFactory}
 
 object Endpoints:
+  val logger: Logger = LoggerFactory.getLogger(getClass)
   case class ApiErrorResponse(
       description: String,
       code: String,
@@ -54,19 +56,19 @@ object Endpoints:
 
   def registerChatLogic(id: Long, repository: LinkRepository[IO]): IO[Either[ApiErrorResponse, Unit]] =
     repository.registerChat(id).map { _ =>
-      println(s"Registered chat with ID $id")
+      logger.info(s"Registered chat with ID $id")
       Right(())
     }
 
   def deleteChatLogic(id: Long, repository: LinkRepository[IO]): IO[Either[ApiErrorResponse, Unit]] =
     repository.deleteChat(id).map { _ =>
-      println(s"Deleted chat with ID $id")
+      logger.info(s"Deleted chat with ID $id")
       Right(())
     }
 
   def getLinksLogic(chatId: Long, repository: LinkRepository[IO]): IO[Either[ApiErrorResponse, ListLinksResponse]] =
     repository.getLinks(chatId).map { links =>
-      println(s"Fetched links for chat $chatId: ${links.size}")
+      logger.info(s"Fetched links for chat $chatId: ${links.size}")
       Right(ListLinksResponse(links, links.size))
     }
 
@@ -77,7 +79,7 @@ object Endpoints:
   ): IO[Either[ApiErrorResponse, LinkResponse]] =
     repository.addLink(chatId, request.link, request.tags, request.filters).map {
       case Some(link) =>
-        println(s"Added link for chat $chatId: ${link.url}")
+        logger.info(s"Added link for chat $chatId: ${link.url}")
         Right(link)
       case None =>
         Left(ApiErrorResponse("Link not added", "404", None, None, None))
@@ -90,7 +92,7 @@ object Endpoints:
   ): IO[Either[ApiErrorResponse, LinkResponse]] =
     repository.removeLink(chatId, request.link).map {
       case Some(link) =>
-        println(s"Removed link for chat $chatId: ${link.url}")
+        logger.info(s"Removed link for chat $chatId: ${link.url}")
         Right(link)
       case None =>
         Left(ApiErrorResponse("Link not found", "404", None, None, None))
@@ -107,7 +109,7 @@ object Endpoints:
       repository: LinkRepository[IO]
   ): IO[Either[ApiErrorResponse, NumberResponse]] =
     repository.addNumber(request.key, request.value) *> IO {
-      println(s"Added number for key ${request.key}: ${request.value}")
+      logger.info(s"Added number for key ${request.key}: ${request.value}")
       Right(NumberResponse(request.key, request.value))
     }
 
@@ -117,7 +119,7 @@ object Endpoints:
   ): IO[Either[ApiErrorResponse, NumberResponse]] =
     repository.getNumber(key).map {
       case Some(value) =>
-        println(s"Fetched number for key $key: $value")
+        logger.info(s"Fetched number for key $key: $value")
         Right(NumberResponse(key, value))
       case None =>
         Left(ApiErrorResponse("Number not found", "404", None, None, None))

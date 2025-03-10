@@ -8,8 +8,9 @@ import cats.syntax.functor.*
 import io.circe.*
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.*
+import org.slf4j.{Logger, LoggerFactory}
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
-import sttp.client3.{SttpBackend, UriContext, asStringAlways, basicRequest}
+import sttp.client3.{SttpBackend, asStringAlways, basicRequest}
 import sttp.model.Uri
 import telegramium.bots.high.implicits.methodOps
 import telegramium.bots.high.{Api, LongPollBot}
@@ -61,12 +62,13 @@ object Command {
 case class PendingTrack(link: String, tags: Option[List[String]] = None, filters: Option[List[String]] = None)
 
 case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: Int)(implicit
-                                                                 bot: Api[F],
-                                                                 asyncF: Async[F],
-                                                                 parallel: Parallel[F]
+                                                                                    bot: Api[F],
+                                                                                    asyncF: Async[F],
+                                                                                    parallel: Parallel[F]
 ) extends LongPollBot[F](bot) {
   private val link = s"http://localhost:$apiPort"
   private val host: Uri = Uri.parse(link).toOption.get
+  private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def onMessage(msg: Message): F[Unit] = {
     val chatId = msg.chat.id
@@ -82,7 +84,7 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
     }
   }
 
-   def handleCommand(chatId: Long, text: String): F[String] = {
+  def handleCommand(chatId: Long, text: String): F[String] = {
     val parts = text.split(" ", 2)
     parts.headOption match {
       case Some(cmd) if cmd == Command.Start.command =>
@@ -104,7 +106,7 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
     }
   }
 
-   def handleTrackCommand(chatId: Long, cmd: String): F[String] = {
+  def handleTrackCommand(chatId: Long, cmd: String): F[String] = {
     val link = cmd.stripPrefix("/track ").trim
     extractLinkValue(link) match {
       case Some(extracted) =>
@@ -117,7 +119,7 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
     }
   }
 
-   def processPendingTrack(chatId: Long, pending: PendingTrack, text: String): F[String] = {
+  def processPendingTrack(chatId: Long, pending: PendingTrack, text: String): F[String] = {
     pending.tags match {
       case None =>
         val tags = text.split(",").map(_.trim).toList
@@ -138,11 +140,13 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
     setMyCommands(commands).exec.void
   }
 
-   def withBackend[T](f: SttpBackend[F, Any] => F[T]): F[T] =
+  def withBackend[T](f: SttpBackend[F, Any] => F[T]): F[T] =
     HttpClientCatsBackend.resource[F]().use(f)
 
-   def registerChat(chatId: Long): F[String] =
+  def registerChat(chatId: Long): F[String] = {
+    logger.info(s"Регистрация чата: $chatId")
     apiPost(host.addPath("tg-chat", chatId.toString), chatId, "Чат зарегистрирован!", "Ошибка регистрации чата.")
+  }
 
   def update(chatIds: List[Long]): F[Unit] =
     chatIds.traverse_(id => sendMessage(id, "победа"))
@@ -159,7 +163,6 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
         Async[F].pure(s"Ошибка при получении списка ссылок: $error")
     }
 
-
   def trackLinkComplete(chatId: Long, link: String, tags: List[String], filters: List[String]): F[String] =
     apiPost(
       host.addPath("links"),
@@ -169,19 +172,19 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
       Some(Json.obj("link" -> link.asJson, "tags" -> tags.asJson, "filters" -> filters.asJson).noSpaces)
     )
 
-   def untrackLink(chatId: Long, link: String): F[String] =
+  def untrackLink(chatId: Long, link: String): F[String] =
     apiDelete(host.addPath("links"), chatId, s"Ссылка удалена: $link", "Ошибка при удалении ссылки.", Some(Json.obj("link" -> link.asJson).noSpaces))
 
-   def apiGet(uri: Uri, chatId: Long, successMsg: String, errorMsg: String): F[String] =
+  def apiGet(uri: Uri, chatId: Long, successMsg: String, errorMsg: String): F[String] =
     apiRequest(basicRequest.get(uri).header("Tg-Chat-Id", chatId.toString), chatId, successMsg, errorMsg)
 
-   def apiPost(uri: Uri, chatId: Long, successMsg: String, errorMsg: String, body: Option[String] = None): F[String] =
+  def apiPost(uri: Uri, chatId: Long, successMsg: String, errorMsg: String, body: Option[String] = None): F[String] =
     apiRequest(basicRequest.post(uri).header("Tg-Chat-Id", chatId.toString).body(body.getOrElse("")), chatId, successMsg, errorMsg)
 
-   def apiDelete(uri: Uri, chatId: Long, successMsg: String, errorMsg: String, body: Option[String] = None): F[String] =
+  def apiDelete(uri: Uri, chatId: Long, successMsg: String, errorMsg: String, body: Option[String] = None): F[String] =
     apiRequest(basicRequest.delete(uri).header("Tg-Chat-Id", chatId.toString).body(body.getOrElse("")), chatId, successMsg, errorMsg)
 
-   def apiRequest(request: sttp.client3.RequestT[sttp.client3.Identity, Either[String, String], Any], chatId: Long, successMsg: String, errorMsg: String): F[String] =
+  def apiRequest(request: sttp.client3.RequestT[sttp.client3.Identity, Either[String, String], Any], chatId: Long, successMsg: String, errorMsg: String): F[String] =
     withBackend { backend =>
       request.response(asStringAlways)
         .send(backend)
@@ -194,7 +197,7 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
         }
     }
 
-   def handleJsonResponse(response: String, chatId: Long, successMsg: String, errorMsg: String): F[String] =
+  def handleJsonResponse(response: String, chatId: Long, successMsg: String, errorMsg: String): F[String] =
     parser.parse(response) match {
       case Right(json) if json.hcursor.downField("code").as[Int].toOption.isDefined =>
         Async[F].pure(errorMsg)
@@ -204,7 +207,7 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
         Async[F].pure(successMsg)
     }
 
-   def extractLinkValue(link: String): Option[String] = {
+  def extractLinkValue(link: String): Option[String] = {
     val soRegex = "https://stackoverflow\\.com/questions/([^/]+)(/.*)?".r
     val ghRegex = "https://github\\.com/([^/]+)/([^/]+)(/.*)?".r
     link match {
@@ -229,7 +232,8 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
         Left("Ошибка! Соединение с Scrapper API не установлено")
     }
 
-
-  def sendMessage(chatId: Long, message: String): F[Unit] =
+  def sendMessage(chatId: Long, message: String): F[Unit] = {
+    logger.info(s"Отправка сообщения в чат $chatId: $message")
     sendMessage(ChatIntId(chatId), message).exec.void
+  }
 }

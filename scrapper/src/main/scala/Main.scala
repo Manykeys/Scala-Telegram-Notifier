@@ -4,10 +4,11 @@ import cats.effect.{ExitCode, IO, IOApp}
 import com.comcast.ip4s.{Host, Port}
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
+import org.slf4j.{Logger, LoggerFactory}
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
 object Main extends IOApp:
-
+  val logger: Logger = LoggerFactory.getLogger(getClass)
   override def run(args: List[String]): IO[ExitCode] =
     for {
       configLoader <- ConfigLoader.make[IO]
@@ -35,10 +36,10 @@ object Main extends IOApp:
         .withHttpApp(Router("/" -> routes).orNotFound)
         .build
         .use: server =>
-          for
-            _ <- IO.println(
-              s"Go to http://localhost:${server.address.getPort}/docs to open SwaggerUI. Press ENTER key to exit."
-            )
-            _ <- IO.readLine
+          for {
+             _ <- IO(logger.info(
+          s"Go to http://localhost:${server.address.getPort}/docs to open SwaggerUI. Press ENTER key to exit."
+          ))
+            _ <- IO.readLine}
           yield ()
     } yield ExitCode.Success

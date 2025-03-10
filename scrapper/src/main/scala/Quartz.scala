@@ -6,9 +6,10 @@ import io.circe.generic.auto.*
 import io.circe.parser.decode
 import org.quartz.*
 import org.quartz.impl.StdSchedulerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import scrapper.Endpoints.{AddNumberRequest, LinksDataResponse, NumberResponse}
 import sttp.client3.httpclient.cats.HttpClientCatsBackend
-import sttp.client3.{UriContext, asStringAlways, basicRequest, emptyRequest}
+import sttp.client3.{asStringAlways, basicRequest, emptyRequest}
 import sttp.model.{StatusCode, Uri}
 import tethys.JsonWriterOps
 import tethys.jackson.*
@@ -19,6 +20,8 @@ import scala.util.Try
 case class Comment(created_at: String)
 
 class GithubJob extends Job {
+  val logger: Logger = LoggerFactory.getLogger(getClass)
+
   private def getEnvInt(name: String): IO[Int] =
     IO(sys.env.get(name)).flatMap {
       case Some(value) =>
@@ -55,20 +58,20 @@ class GithubJob extends Job {
             case StatusCode.Ok =>
               decode[LinksDataResponse](responseBody) match {
                 case Right(linksData) =>
-                  println(s"Получены данные: ${linksData.data.keys.mkString(", ")}")
+                  logger.info(s"Получены данные: ${linksData.data.keys.mkString(", ")}")
                   linksData
                 case Left(err) =>
-                  println(s"Ошибка парсинга JSON: $err")
+                  logger.info(s"Ошибка парсинга JSON: $err")
                   LinksDataResponse(Map.empty)
               }
             case status =>
-              println(s"Ошибка запроса: статус ${status.code}, тело ответа: $responseBody")
+              IO.pure(logger.info(s"Ошибка запроса: статус ${status.code}, тело ответа: $responseBody"))
               LinksDataResponse(Map.empty)
           }
         }
       } yield response
     }.handleErrorWith { error =>
-      IO.println(s"Ошибка при выполнении запроса: ${error.getMessage}") *> IO.pure(LinksDataResponse(Map.empty))
+      IO.pure(logger.info(s"Ошибка при выполнении запроса: ${error.getMessage}")) *> IO.pure(LinksDataResponse(Map.empty))
     }
   }
 
@@ -99,7 +102,7 @@ class GithubJob extends Job {
         .body(AddNumberRequest(identifier, newTimestamp).asJson)
         .response(asStringAlways)
       backend.send(updateReq).flatMap { resp =>
-        IO.println(s"Обновлено число для $identifier: ответ: ${resp.body}")
+        IO.pure(logger.info(s"Обновлено число для $identifier: ответ: ${resp.body}"))
       }
     } *> {
       linksData.data.get(identifier) match {
@@ -108,18 +111,18 @@ class GithubJob extends Job {
             val arrayChatIds = chatIds.mkString("[", ", ", "]")
             val jsonBody =
               s"""{"id": ${chatIds.head}, "url": "$identifier","description": "string","tgChatsIds": $arrayChatIds}"""
-            IO.println(jsonBody)
+            IO.pure(logger.info(jsonBody))
             val updateChatReq = basicRequest
               .post(tgUri.addPath("updates"))
               .body(jsonBody)
               .contentType("application/json")
               .response(asStringAlways)
             backend.send(updateChatReq).flatMap { resp =>
-              IO.println(s"Отправлено обновление для chatId $chatIds: ответ: ${resp.body}")
+              IO.pure(logger.info(s"Отправлено обновление для chatId $chatIds: ответ: ${resp.body}"))
             }
           }
         case None =>
-          IO.println(s"Для репозитория $identifier не найдены chatId")
+          IO.pure(logger.info(s"Для репозитория $identifier не найдены chatId"))
       }
     }
   }
@@ -139,16 +142,16 @@ class GithubJob extends Job {
               .toEither
               .leftMap(ex => new Exception(s"Ошибка парсинга created_at для $identifier: ${ex.getMessage}"))
           )
-          _ <- IO.println(s"Repo $identifier: новый timestamp = $newTimestamp")
+          _ <- IO.pure(logger.info(s"Repo $identifier: новый timestamp = $newTimestamp"))
           currentNumberResponseOpt <- fetchCurrentNumber(apiUri, identifier)
           currentValue = currentNumberResponseOpt.map(_.value).getOrElse(0L)
-          _ <- IO.println(s"Repo $identifier: текущее сохранённое значение = $currentValue")
+          _ <- IO.pure(logger.info(s"Repo $identifier: текущее сохранённое значение = $currentValue"))
           _ <- if (newTimestamp != currentValue) {
             updateNumberAndNotify(apiUri, tgUri, identifier, newTimestamp, linksData)
-          } else IO.println(s"Для репозитория $identifier обновление не требуется")
+          } else IO.pure(logger.info(s"Для репозитория $identifier обновление не требуется"))
         } yield ()
       case None =>
-        IO.println(s"Для репозитория $identifier не найдено ни одного комментария")
+        IO.pure(logger.info(s"Для репозитория $identifier не найдено ни одного комментария"))
     }
   }
 
@@ -166,7 +169,7 @@ class GithubJob extends Job {
         case GithubCommentsResponse(comments) =>
           processGithubComments(apiUri, tgUri, identifier, comments, linksData)
         case StackOverflowCommentsResponse(response) =>
-          IO.println(s"StackOverflow response for $identifier: $response")
+          IO.pure(logger.info(s"StackOverflow response for $identifier: $response"))
       }
     }
   }
@@ -179,7 +182,6 @@ class GithubJob extends Job {
       tgUri   <- buildUri(s"http://localhost:$tgPort")
       token     <- getToken
       linksData <- getLinks(apiUri)
-      _         <- IO.println("все ок")
       _ <- linksData.data.keys.toList.traverse_ { identifier =>
         processSingleLink(apiUri, tgUri, identifier, token, linksData)
       }
