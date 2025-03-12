@@ -118,7 +118,7 @@ class EchoBotSpec extends CatsEffectSuite {
     for {
       ref <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
       bot = new TestHttpEchoBot(ref, stub, 8080)
-      result <- bot.trackLinkComplete(chatId, link, tags, filters)
+      result <- bot.trackLinkComplete(chatId, link, Option(tags), Option(filters))
     } yield assertEquals(result, s"Ссылка добавлена: $link")
   }
 
@@ -147,5 +147,18 @@ class EchoBotSpec extends CatsEffectSuite {
       bot = new TestHttpEchoBot(ref, stub, 8080)
       result <- bot.untrackLink(chatId, link)
     } yield assertEquals(result, s"Ссылка удалена: $link")
+  }
+
+  test("неизвестная команда выдает ошибку") {
+    val chatId         = 1L
+    val unknownCommand = "/unknown"
+
+    val monad = new CatsMonadError[IO]
+    val stub  = SttpBackendStub[IO, Any](monad)
+    for {
+      ref <- Ref.of[IO, Map[Long, PendingTrack]](Map.empty)
+      bot = new TestHttpEchoBot(ref, stub, 8080)
+      result <- bot.handleCommand(chatId, unknownCommand)
+    } yield assertEquals(result, "Ошибка: неизвестная команда")
   }
 }

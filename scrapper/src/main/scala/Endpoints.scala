@@ -1,6 +1,8 @@
 package scrapper
 
 import cats.effect.IO
+import io.circe.Encoder
+import io.circe.generic.semiauto.deriveEncoder
 import org.slf4j.{Logger, LoggerFactory}
 import scrapper.repository.LinkRepository
 import sttp.tapir.*
@@ -33,9 +35,8 @@ object Endpoints:
   implicit val apiErrorResponseReader: JsonReader[ApiErrorResponse]       = JsonReader.derived
   implicit val apiErrorResponseWriter: JsonObjectWriter[ApiErrorResponse] = JsonObjectWriter.derived
 
-  implicit val linkResponseReader: JsonReader[LinkResponse]       = JsonReader.derived
-  implicit val linkResponseWriter: JsonObjectWriter[LinkResponse] = JsonObjectWriter.derived
-
+  implicit val linkResponseReader: JsonReader[LinkResponse]           = JsonReader.derived
+  implicit val linkResponseWriter: JsonObjectWriter[LinkResponse]     = JsonObjectWriter.derived
   implicit val addLinkRequestReader: JsonReader[AddLinkRequest]       = JsonReader.derived
   implicit val addLinkRequestWriter: JsonObjectWriter[AddLinkRequest] = JsonObjectWriter.derived
 
@@ -51,6 +52,7 @@ object Endpoints:
   implicit val numberResponseReader: JsonReader[NumberResponse]       = JsonReader.derived
   implicit val numberResponseWriter: JsonObjectWriter[NumberResponse] = JsonObjectWriter.derived
 
+  given Encoder[NumberResponse]                                            = deriveEncoder
   implicit val addNumberResponseReader: JsonReader[AddNumberRequest]       = JsonReader.derived
   implicit val addNumberResponseWriter: JsonObjectWriter[AddNumberRequest] = JsonObjectWriter.derived
 
@@ -77,13 +79,22 @@ object Endpoints:
       request: AddLinkRequest,
       repository: LinkRepository[IO]
   ): IO[Either[ApiErrorResponse, LinkResponse]] =
-    repository.addLink(chatId, request.link, request.tags, request.filters).map {
-      case Some(link) =>
-        logger.info(s"Added link for chat $chatId: ${link.url}")
-        Right(link)
-      case None =>
-        Left(ApiErrorResponse("Link not added", "404", None, None, None))
-    }
+    for {
+      existingLinks <- repository.getLinks(chatId)
+      result <- if (existingLinks.exists(_.url == request.link)) {
+        IO.pure(
+          Left(ApiErrorResponse("Duplicate link", "409", None, Some("This link already exists"), None))
+        )
+      } else {
+        repository.addLink(chatId, request.link, request.tags, request.filters).map {
+          case Some(link) =>
+            logger.info(s"Added link for chat $chatId: ${link.url}")
+            Right(link)
+          case None =>
+            Left(ApiErrorResponse("Link not added", "404", None, None, None))
+        }
+      }
+    } yield result
 
   def removeLinkLogic(
       chatId: Long,

@@ -5,30 +5,19 @@ import com.comcast.ip4s.{Host, Port}
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
 import org.slf4j.{Logger, LoggerFactory}
+import pureconfig.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
 object Main extends IOApp:
   val logger: Logger = LoggerFactory.getLogger(getClass)
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      configLoader <- ConfigLoader.make[IO]
-      config       <- configLoader.load
-      maybePort        = config.httpPort.toOption
-      maybeGithubToken = config.githubToken.toOption
+      config <- IO.fromOption(ConfigSource.default.load[ServiceConf].toOption)(new RuntimeException("cfg error"))
+      port   <- IO.fromOption(Port.fromInt(config.apiPort))(new Error("port parse error"))
+      githubToken = config.githubToken
 
       endpoints <- Endpoints.all
       routes = Http4sServerInterpreter[IO]().toRoutes(endpoints)
-
-      port <- maybePort match {
-        case Some(p) => IO.pure(p)
-        case None    => IO.raiseError(new RuntimeException("API_PORT is missing or invalid"))
-      }
-
-      githubToken <- maybeGithubToken match {
-        case Some(p) => IO.pure(p)
-        case None    => IO.raiseError(new RuntimeException("GITHUB_TOKEN is missing or invalid"))
-      }
-
       _ <- EmberServerBuilder
         .default[IO]
         .withHost(Host.fromString("localhost").get)

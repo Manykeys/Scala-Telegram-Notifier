@@ -3,8 +3,6 @@ package bot
 import cats.Parallel
 import cats.effect.{Async, Ref}
 import cats.implicits.*
-import cats.syntax.flatMap.*
-import cats.syntax.functor.*
 import io.circe.*
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.*
@@ -67,10 +65,10 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
     parallel: Parallel[F]
 ) extends LongPollBot[F](bot) {
 
-  private val linka: String = s"http://localhost:$apiPort"
+  private val apiLink: String = s"http://localhost:$apiPort"
 
   def getHost[F[_]: Async]: F[Uri] = {
-    Async[F].fromEither(Uri.parse(linka).leftMap(e => new Throwable(s"Invalid URL: $linka")))
+    Async[F].fromEither(Uri.parse(apiLink).leftMap(e => new Throwable(s"Invalid URL: $apiLink")))
   }
 
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -107,7 +105,7 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
         else
           Async[F].pure(s"Usage: ${Command.Untrack.command} <link>")
       case _ =>
-        Async[F].pure("")
+        Async[F].pure("Ошибка: неизвестная команда")
     }
   }
 
@@ -116,7 +114,9 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
     extractLinkValue(link) match {
       case Some(extracted) =>
         pendingRef.update(_ + (chatId -> PendingTrack(extracted))) *>
-          Async[F].pure(s"Ссылка принята: $extracted. Пришлите теги (через запятую)")
+          Async[F].pure(
+            s"Ссылка принята: $extracted. Пришлите теги (через запятую) или напишите 'skip' для пропуска."
+          )
       case None =>
         Async[F].pure(
           "Неверный формат ссылки. Допустимые форматы: https://stackoverflow.com/questions/{value}/* или https://github.com/{value}/{value}/*"
@@ -127,20 +127,35 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
   def processPendingTrack(chatId: Long, pending: PendingTrack, text: String): F[String] = {
     pending.tags match {
       case None =>
-        val tags = text.split(",").map(_.trim).toList
-        pendingRef.update(_.updated(chatId, pending.copy(tags = Some(tags)))) *>
-          Async[F].pure("Теги сохранены. Теперь пришлите фильтры (через запятую)")
+        if (text.trim.toLowerCase == "skip") {
+          pendingRef.update(_.updated(chatId, pending.copy(tags = Some(List.empty)))) *>
+            Async[F].pure(
+              "Теги пропущены. Теперь пришлите фильтры (через запятую) или напишите 'skip' для пропуска."
+            )
+        } else {
+          val tags = text.split(",").map(_.trim).filter(_.nonEmpty).toList
+          pendingRef.update(_.updated(chatId, pending.copy(tags = Some(tags)))) *>
+            Async[F].pure(
+              "Теги сохранены. Теперь пришлите фильтры (через запятую) или напишите 'skip' для пропуска."
+            )
+        }
       case Some(_) if pending.filters.isEmpty =>
-        val filters         = text.split(",").map(_.trim).toList
-        val completePending = pending.copy(filters = Some(filters))
-        pendingRef.update(_ - chatId) *>
-          trackLinkComplete(chatId, completePending.link, completePending.tags.get, completePending.filters.get)
+        if (text.trim.toLowerCase == "skip") {
+          val completePending = pending.copy(filters = Some(List.empty))
+          pendingRef.update(_ - chatId) *>
+            trackLinkComplete(chatId, completePending.link, completePending.tags, completePending.filters)
+        } else {
+          val filters         = text.split(",").map(_.trim).filter(_.nonEmpty).toList
+          val completePending = pending.copy(filters = Some(filters))
+          pendingRef.update(_ - chatId) *>
+            trackLinkComplete(chatId, completePending.link, completePending.tags, completePending.filters)
+        }
       case _ =>
         Async[F].pure("")
     }
   }
 
-  def setMyCommands2(): F[Unit] = {
+  def setMyCustomCommands(): F[Unit] = {
     val commands = Command.all.map(cmd => BotCommand(command = cmd.command, description = cmd.description))
     setMyCommands(commands).exec.void
   }
@@ -172,7 +187,12 @@ case class EchoBot[F[_]](pendingRef: Ref[F, Map[Long, PendingTrack]], apiPort: I
       }
     )
 
-  def trackLinkComplete(chatId: Long, link: String, tags: List[String], filters: List[String]): F[String] =
+  def trackLinkComplete(
+      chatId: Long,
+      link: String,
+      tags: Option[List[String]],
+      filters: Option[List[String]]
+  ): F[String] =
     getHost.flatMap(host =>
       apiPost(
         host.addPath("links"),
