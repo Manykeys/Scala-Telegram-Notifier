@@ -1,14 +1,17 @@
 package scrapper
 
 import Clients.GithubComment
+import QuartzScheduler.*
+import QuartzScheduler.Models.*
 import cats.effect.IO
 import munit.CatsEffectSuite
-import scrapper.Endpoints.{LinksDataResponse, NumberResponse}
+import scrapper.Models.Responses.*
 import sttp.model.Uri
 
 import java.time.Instant
 
-class NotifierSpec extends CatsEffectSuite {
+class QuartzSpec extends CatsEffectSuite {
+  val dummyConfig = ServiceConf(apiPort = 8080, tgPort = 8081, githubToken = "dummyToken")
   test("Notifier.updateNumberAndNotify отправляет уведомление только для пользователей, следящих за ссылкой") {
     val dummyNumberUpdater = new NumberUpdater {
       override def updateNumber(apiUri: Uri, payload: NumberUpdatePayload): IO[String] =
@@ -43,10 +46,6 @@ class NotifierSpec extends CatsEffectSuite {
       _ = assert(!telegramCalled)
     } yield ()
   }
-}
-
-class GithubCommentsProcessorSpec extends CatsEffectSuite {
-  val dummyConfig = ServiceConf(apiPort = 8080, tgPort = 8081, githubToken = "dummyToken")
 
   test(
     "processGithubComments отправляет обновление, если новый timestamp отличается и пользователь следит за ссылкой"
