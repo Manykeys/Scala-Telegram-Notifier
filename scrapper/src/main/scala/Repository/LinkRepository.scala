@@ -2,7 +2,7 @@ package scrapper.repository
 
 import cats.effect.{Ref, Sync}
 import cats.implicits.*
-import scrapper.Endpoints.LinkResponse
+import scrapper.Models.Responses.*
 
 trait LinkRepository[F[_]] {
   def registerChat(chatId: Long): F[Unit]

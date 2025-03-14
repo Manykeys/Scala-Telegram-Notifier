@@ -2,7 +2,7 @@ package Repository
 
 import cats.effect.IO
 import munit.CatsEffectSuite
-import scrapper.Endpoints.{AddLinkRequest, LinkResponse}
+import scrapper.Models.Requests.*
 import scrapper.repository.LinkRepository
 
 class LinkRepositoryTest extends CatsEffectSuite {

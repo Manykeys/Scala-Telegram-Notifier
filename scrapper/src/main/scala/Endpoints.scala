@@ -1,60 +1,18 @@
 package scrapper
 
 import cats.effect.IO
-import io.circe.Encoder
-import io.circe.generic.semiauto.deriveEncoder
 import org.slf4j.{Logger, LoggerFactory}
+import scrapper.Models.Requests.*
+import scrapper.Models.Responses.*
 import scrapper.repository.LinkRepository
 import sttp.tapir.*
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.tethysjson.jsonBody
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
-import tethys.readers.tokens.TokenIterator
-import tethys.writers.tokens.TokenWriter
-import tethys.{JsonObjectWriter, JsonReader, JsonWriter, readers}
 
 object Endpoints:
   val logger: Logger = LoggerFactory.getLogger(getClass)
-  case class ApiErrorResponse(
-      description: String,
-      code: String,
-      exceptionName: Option[String],
-      exceptionMessage: Option[String],
-      stacktrace: Option[List[String]]
-  )
-
-  case class LinkResponse(id: Long, url: String, tags: List[String], filters: List[String])
-  case class AddLinkRequest(link: String, tags: List[String], filters: List[String])
-  case class RemoveLinkRequest(link: String)
-  case class ListLinksResponse(links: List[LinkResponse], size: Int)
-  case class LinksDataResponse(data: Map[String, List[Long]])
-  case class AddNumberRequest(key: String, value: Long)
-  case class NumberResponse(key: String, value: Long)
-
-  implicit val apiErrorResponseReader: JsonReader[ApiErrorResponse]       = JsonReader.derived
-  implicit val apiErrorResponseWriter: JsonObjectWriter[ApiErrorResponse] = JsonObjectWriter.derived
-
-  implicit val linkResponseReader: JsonReader[LinkResponse]           = JsonReader.derived
-  implicit val linkResponseWriter: JsonObjectWriter[LinkResponse]     = JsonObjectWriter.derived
-  implicit val addLinkRequestReader: JsonReader[AddLinkRequest]       = JsonReader.derived
-  implicit val addLinkRequestWriter: JsonObjectWriter[AddLinkRequest] = JsonObjectWriter.derived
-
-  implicit val removeLinkRequestReader: JsonReader[RemoveLinkRequest]       = JsonReader.derived
-  implicit val removeLinkRequestWriter: JsonObjectWriter[RemoveLinkRequest] = JsonObjectWriter.derived
-
-  implicit val listLinksResponseReader: JsonReader[ListLinksResponse]       = JsonReader.derived
-  implicit val listLinksResponseWriter: JsonObjectWriter[ListLinksResponse] = JsonObjectWriter.derived
-
-  implicit val linksDataResponseReader: JsonReader[LinksDataResponse]       = JsonReader.derived
-  implicit val linksDataResponseWriter: JsonObjectWriter[LinksDataResponse] = JsonObjectWriter.derived
-
-  implicit val numberResponseReader: JsonReader[NumberResponse]       = JsonReader.derived
-  implicit val numberResponseWriter: JsonObjectWriter[NumberResponse] = JsonObjectWriter.derived
-
-  given Encoder[NumberResponse]                                            = deriveEncoder
-  implicit val addNumberResponseReader: JsonReader[AddNumberRequest]       = JsonReader.derived
-  implicit val addNumberResponseWriter: JsonObjectWriter[AddNumberRequest] = JsonObjectWriter.derived
 
   def registerChatLogic(id: Long, repository: LinkRepository[IO]): IO[Either[ApiErrorResponse, Unit]] =
     repository.registerChat(id).map { _ =>
