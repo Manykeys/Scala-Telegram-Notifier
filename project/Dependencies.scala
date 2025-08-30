@@ -4,6 +4,7 @@ object Dependencies {
   // cats
   val catsCore   = "org.typelevel" %% "cats-core"   % "2.13.0"
   val catsEffect = "org.typelevel" %% "cats-effect" % "3.5.7"
+  val catsTest = "org.typelevel" %% "munit-cats-effect-3" % "1.0.7" % Test
 
   // tapir
   val tapirVersion = "1.11.13"
@@ -41,9 +42,19 @@ object Dependencies {
   val pureConfigCore    = "com.github.pureconfig" %% "pureconfig-core"           % pureConfigVersion
   val pureConfigGeneric = "com.github.pureconfig" %% "pureconfig-generic-scala3" % pureConfigVersion
 
+  // quartz4s
+  val quartz = "com.itv" %% "quartz4s-core" % "1.0.4"
+
+  val telegramiumCore = "io.github.apimorphism" %% "telegramium-core" % "9.803.0"
+  val telegramiumHigh = "io.github.apimorphism" %% "telegramium-high" % "9.803.0"
+
+  val testLib = "org.scalatest" %% "scalatest" % "3.2.17" % Test
+  val plus = "org.scalatestplus" %% "mockito-5-10" % "3.2.18.0" % Test
+  val mock = "org.scalamock" %% "scalamock" % "6.0.0" % Test
   val allDeps: Seq[ModuleID] = Seq(
     catsCore,
     catsEffect,
+    catsTest,
     tapirHttp4s,
     tapirSwagger,
     tapirTethys,
@@ -57,6 +68,12 @@ object Dependencies {
     tethysJackson,
     tethysDerivation,
     pureConfigCore,
-    pureConfigGeneric
+    pureConfigGeneric,
+    quartz,
+    telegramiumCore,
+    telegramiumHigh,
+    testLib,
+    plus,
+    mock
   )
 }
